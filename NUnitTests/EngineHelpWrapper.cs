@@ -23,8 +23,10 @@ namespace NUnitTests
 		public HostedScriptEngine Engine { get; private set; }
 
 		public IValue TestRunner { get; private set; }
+		
+		private ScriptingEngine MainEngine { get; set; }
 
-		public HostedScriptEngine StartEngine()
+		public void StartEngine()
 		{
 			var mainEngine = DefaultEngineBuilder.Create()
 				.SetDefaultOptions()
@@ -36,27 +38,27 @@ namespace NUnitTests
 				.Build();
 			
 			Engine = new HostedScriptEngine(mainEngine);
+			MainEngine = mainEngine;
 
 			var testrunnerSource = LoadFromAssemblyResource("NUnitTests.Tests.testrunner.os");
 			var testrunnerModule = Engine.GetCompilerService().Compile(testrunnerSource);
 
-			Engine.EngineInstance.AttachedScriptsFactory.RegisterTypeModule("TestRunner", testrunnerModule);
+			mainEngine.AttachedScriptsFactory.RegisterTypeModule("TestRunner", testrunnerModule);
 
-			TestRunner = NewInstanceOf("TestRunner", Engine.EngineInstance);
-
-			return Engine;
+			TestRunner = NewInstanceOf("TestRunner", mainEngine);
 		}
 
 		public void RunTestScript(string resourceName)
 		{
 			var source = LoadFromAssemblyResource(resourceName);
 			var module = Engine.GetCompilerService().Compile(source);
-			Engine.EngineInstance.AttachedScriptsFactory.RegisterTypeModule(resourceName, module);
+			
+			MainEngine.AttachedScriptsFactory.RegisterTypeModule(resourceName, module);
 
-			var test = NewInstanceOf(resourceName, Engine.EngineInstance);
+			var test = NewInstanceOf(resourceName, MainEngine);
 			ArrayImpl testArray;
 			{
-				int methodIndex = test.FindMethod("ПолучитьСписокТестов");
+				int methodIndex = test.GetMethodNumber("ПолучитьСписокТестов");
 
 				{
 					IValue ivTests;
@@ -68,7 +70,7 @@ namespace NUnitTests
 			foreach (var ivTestName in testArray)
 			{
 				string testName = ivTestName.AsString();
-				int methodIndex = test.FindMethod(testName);
+				int methodIndex = test.GetMethodNumber(testName);
 				if (methodIndex == -1)
 				{
 					// Тест указан, но процедуры нет или она не экспортирована
